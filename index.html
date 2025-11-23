@@ -3,7 +3,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Alekiu FISH | Configurador Pro</title>
     <style>
         :root {
@@ -13,12 +13,13 @@
             --neon-cyan: #00FFFF;
             --neon-blue: #2979ff;
             --neon-green: #00ff9d;
+            --whatsapp-green: #25D366;
             --text-main: #e0f7fa;
             
-            /* Variables Geometría (Base) */
-            --tank-l: 400px; 
-            --tank-h: 300px;
-            --tank-w: 200px;
+            /* Variables Geometría */
+            --tank-l: 300px; 
+            --tank-h: 200px;
+            --tank-w: 150px;
             --wood-h: 25px; 
             --glass-lid-h: 4px;
             
@@ -28,7 +29,7 @@
             --water-color: rgba(0, 255, 255, 0.08);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
             background-color: var(--bg-deep);
@@ -47,17 +48,25 @@
         header { padding: 2rem; text-align: center; border-bottom: 1px solid rgba(0,255,255,0.1); }
         h1 { 
             letter-spacing: 4px; text-transform: uppercase; font-weight: 900; 
-            font-size: 5rem; color: var(--neon-cyan); margin: 0; font-style: italic;
+            font-size: 4rem; color: var(--neon-cyan); margin: 0; font-style: italic;
             text-shadow: 0 0 30px rgba(0,255,255,0.5); 
         }
         h1 span { font-weight: 300; color: #fff; font-size: 0.5em; font-style: normal; margin-left: 10px; }
+
+        /* Responsive Header Font */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            header { padding: 1.5rem 1rem; }
+        }
 
         /* GRID PRINCIPAL */
         main {
             flex: 1; display: grid; grid-template-columns: 480px 1fr; gap: 4rem;
             padding: 3rem; max-width: 1900px; margin: 0 auto; width: 100%;
         }
-        @media (max-width: 1200px) { main { grid-template-columns: 1fr; } }
+        @media (max-width: 1200px) { 
+            main { grid-template-columns: 1fr; gap: 2rem; padding: 1.5rem; } 
+        }
 
         /* PANEL LATERAL */
         .panel {
@@ -141,6 +150,20 @@
         .summary-total { display: flex; justify-content: space-between; margin-top: 20px; border-top: 1px solid var(--neon-green); padding-top: 15px; font-size: 2rem; color: var(--neon-green); font-weight: bold; }
         .remove-item { color: #ff4444; cursor: pointer; margin-left: 10px; font-size: 0.9rem; }
 
+        /* BOTÓN WHATSAPP */
+        .btn-whatsapp {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; margin-top: 20px; padding: 15px;
+            background: var(--whatsapp-green); color: #fff;
+            border: none; border-radius: 8px;
+            font-size: 1.2rem; font-weight: bold; text-transform: uppercase;
+            cursor: pointer; transition: 0.3s; box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+        }
+        .btn-whatsapp:hover {
+            background: #20bd5a; transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(37, 211, 102, 0.5);
+        }
+
         /* --- VISUALIZADOR 3D --- */
         .viewer-container {
             position: relative; height: 800px;
@@ -148,11 +171,18 @@
             border-radius: 16px; overflow: hidden; cursor: grab;
             display: flex; align-items: center; justify-content: center;
             perspective: 2000px;
+            /* IMPORTANTE PARA MÓVIL: Evita que el navegador haga scroll al tocar aquí */
+            touch-action: none; 
         }
         .viewer-container:active { cursor: grabbing; }
         .instruction-overlay {
             position: absolute; bottom: 40px; width: 100%; text-align: center;
             color: rgba(255,255,255,0.4); font-size: 1.1rem; pointer-events: none; text-transform: uppercase; letter-spacing: 3px;
+        }
+
+        @media (max-width: 768px) {
+            .viewer-container { height: 500px; }
+            .instruction-overlay { font-size: 0.9rem; bottom: 20px; }
         }
 
         /* ESCENA 3D */
@@ -345,6 +375,9 @@
                     <span>TOTAL:</span>
                     <span id="totalPrice">S/ 0.00</span>
                 </div>
+                <button class="btn-whatsapp" onclick="sendToWhatsapp()">
+                    <span>💬 Solicitar por WhatsApp</span>
+                </button>
             </div>
         </section>
 
@@ -406,11 +439,13 @@
     </section>
 
     <script>
-        const SCALE = 6; 
+        // Variables Globales
+        let currentScale = 6;
         let currentFinish = 'rimless';
         let cart = [];
+        let currentTotal = 0;
 
-        // DOM
+        // DOM Elements
         const root = document.documentElement;
         const inpL = document.getElementById('inpL'), inpH = document.getElementById('inpH'), inpW = document.getElementById('inpW');
         const txtLiters = document.getElementById('txtLiters');
@@ -422,6 +457,13 @@
         const checkFilter = document.getElementById('checkFilter'), filterPriceDisplay = document.getElementById('filterPriceDisplay');
         const recIcon = document.getElementById('recIcon'), recTitle = document.getElementById('recTitle'), recDesc = document.getElementById('recDesc');
 
+        // Función para determinar escala en móvil
+        function determineScale() {
+            currentScale = window.innerWidth < 768 ? 2.8 : 6;
+            updateTank(); // Recalcular visualización
+        }
+        window.addEventListener('resize', determineScale);
+
         function updateTank() {
             let l = parseFloat(inpL.value) || 30;
             let h = parseFloat(inpH.value) || 30;
@@ -429,9 +471,9 @@
             let volume = (l * h * w) / 1000;
             txtLiters.innerText = Math.round(volume);
 
-            root.style.setProperty('--tank-l', (l * SCALE) + 'px');
-            root.style.setProperty('--tank-h', (h * SCALE) + 'px');
-            root.style.setProperty('--tank-w', (w * SCALE) + 'px');
+            root.style.setProperty('--tank-l', (l * currentScale) + 'px');
+            root.style.setProperty('--tank-h', (h * currentScale) + 'px');
+            root.style.setProperty('--tank-w', (w * currentScale) + 'px');
 
             let filterData = getFilterData(volume);
             recIcon.innerText = filterData.icon;
@@ -499,7 +541,68 @@
             });
 
             orderList.innerHTML = html;
-            totalPriceEl.innerText = "S/ " + (basePrice + finishPrice + lidPrice + baseCost + filterCost + accTotal).toFixed(2);
+            currentTotal = basePrice + finishPrice + lidPrice + baseCost + filterCost + accTotal;
+            totalPriceEl.innerText = "S/ " + currentTotal.toFixed(2);
+        }
+
+        // --- WhatsApp Function (SIN EMOJIS EN MENSAJE) ---
+        function sendToWhatsapp() {
+            let l = parseFloat(inpL.value);
+            let h = parseFloat(inpH.value);
+            let w = parseFloat(inpW.value);
+            let liters = Math.round((l * h * w) / 1000);
+            
+            // Recalcular precios para mensaje
+            let basePrice = 0;
+            if (liters <= 30) basePrice = 50;
+            else if (liters <= 50) basePrice = 70;
+            else if (liters <= 80) basePrice = 100;
+            else if (liters <= 100) basePrice = 200;
+            else if (liters <= 120) basePrice = 220;
+            else if (liters <= 150) basePrice = 250;
+            else if (liters <= 200) basePrice = 300;
+            else basePrice = 300 + ((liters - 200) * 2);
+
+            let finishPrice = (currentFinish === 'metal') ? 50 : 0;
+            let finishName = (currentFinish === 'metal') ? 'Marco Aluminio' : 'Sin Marco (Acabado Lujo)';
+            
+            let lidPrice = 0;
+            let lidName = 'Sin Tapa';
+            if (selLid.value === 'wood') { lidPrice = 100; lidName = 'Tapa de Madera 3D'; }
+            if (selLid.value === 'glass') { lidPrice = 10; lidName = 'Tapa de Vidrio 3D'; }
+
+            let filterCost = checkFilter.checked ? parseInt(filterPriceDisplay.innerText) : 0;
+
+            // Mensaje LIMPIO sin emojis
+            let msg = `*Hola Alekiu FISH! Quiero hacer realidad este acuario:*\n\n`;
+            msg += `*DETALLES DE LA COTIZACION:*\n\n`;
+            
+            msg += `*Medidas:* ${l}x${h}x${w} cm\n`;
+            msg += `*Volumen:* ${liters} Litros (S/ ${basePrice.toFixed(2)})\n\n`;
+            
+            msg += `*Estilo:* ${finishName} (+S/ ${finishPrice.toFixed(2)})\n`;
+            msg += `*Tapa:* ${lidName} (+S/ ${lidPrice.toFixed(2)})\n`;
+            
+            if(checkBase.checked) {
+                msg += `*Base:* Estructura Madera 3D (+S/ 150.00)\n`;
+            }
+
+            if(checkFilter.checked) {
+                msg += `*Sistema:* ${recTitle.innerText} (+S/ ${filterCost.toFixed(2)})\n`;
+            }
+
+            if(cart.length > 0) {
+                msg += `\n*ACCESORIOS EXTRA:*\n`;
+                cart.forEach(item => {
+                    msg += `- ${item.name} (S/ ${item.price.toFixed(2)})\n`;
+                });
+            }
+
+            msg += `\n*INVERSION TOTAL:* S/ ${currentTotal.toFixed(2)}\n\n`;
+            msg += `*Por favor, confirmenme disponibilidad.*`;
+
+            let encodedMsg = encodeURIComponent(msg);
+            window.open(`https://wa.me/51908761978?text=${encodedMsg}`, '_blank');
         }
 
         function generateLife(liters) {
@@ -559,8 +662,10 @@
 
         const viewer = document.getElementById('viewer'), scene = document.getElementById('scene');
         let isDragging = false, startX, startY, rotX = -15, rotY = 35;
+        
         const startDrag = (x, y) => { isDragging = true; startX = x; startY = y; viewer.style.cursor = 'grabbing'; };
         const stopDrag = () => { isDragging = false; viewer.style.cursor = 'grab'; };
+        
         const moveDrag = (x, y) => {
             if(!isDragging) return;
             let dX = x - startX, dY = y - startY;
@@ -569,12 +674,18 @@
             scene.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
             startX = x; startY = y;
         };
+
         viewer.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
         window.addEventListener('mouseup', stopDrag);
         window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
-        viewer.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY));
+        
+        // Soporte Touch Móvil (con prevención de scroll)
+        viewer.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
         window.addEventListener('touchend', stopDrag);
-        window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX, e.touches[0].clientY));
+        viewer.addEventListener('touchmove', e => {
+            if(isDragging) e.preventDefault(); // Bloquear scroll de página al rotar
+            moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
 
         const products = [
             { n: "Filtro Canister Pro", p: 350, i: "🛢️" }, { n: "Luz LED Full Spectrum", p: 180, i: "💡" },
@@ -592,6 +703,8 @@
                 </div>`;
         });
 
+        // Iniciar
+        determineScale();
         updateTank();
     </script>
 </body>
